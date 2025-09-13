@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Monastery Search</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: darkred;
+      color:goldenrod;
+    }
+    #search-container {
+      position: relative;
+      background-color: darkred;
+      width: 320px;
+      margin-bottom: 20px;
+    }
+    #searchBox {
+      width: 300px;
+      padding: 10px;
+      background: darkred;
+      color: goldenrod;
+      font-size: 16px;
+    }
+    #searchBtn {
+      padding: 10px 14px;
+      font-size: 16px;
+      color:darkred;
+      background: goldenrod;
+      cursor: pointer;
+    }
+    #suggestions {
+      position: absolute;
+      top: 42px;
+      left: 0;
+      border: 1px solid #ccc;
+      width: 300px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      display: none;
+      z-index: 1000;
+    }
+    .suggestion-item {
+      padding: 8px;
+      cursor: pointer;
+    }
+    .suggestion-item:hover {
+      background-color: #e6e6e6;
+    }
+    #results, #categories {
+      margin-top: 20px;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .result-item {
+      border-bottom: 1px solid #ddd;
+      padding: 10px 0;
+    }
+    .map-link {
+      color: red;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .category-block {
+      margin-bottom: 20px;
+    }
+    .category-title {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+  
+</head>
+<body>
+  <header>
+    <h1><center>Monastery Search</center></h1>
+    
+  </header>
+  
+  
+  <div id="search-container">
+    <input type="text" id="searchBox" placeholder="Search monasteries...">
+    <button id="searchBtn">Search</button>
+    <div id="suggestions"></div>
+  </div>
+
+  <div id="results"></div>
+  
+
+
+  <script>
+    const API_BASE = "http://localhost:3000";
+    let monasteries = [];
+
+    async function fetchAllData() {
+      const res = await fetch(`${API_BASE}/search?q=`);
+      monasteries = await res.json();
+      localStorage.setItem('monasteries', JSON.stringify(monasteries));
+    }
+
+    async function loadCategories() {
+      const res = await fetch(`${API_BASE}/categories`);
+      const categories = await res.json();
+      const container = document.getElementById('categories');
+      container.innerHTML = '';
+
+      Object.keys(categories).forEach(district => {
+        const block = document.createElement('div');
+        block.className = 'category-block';
+        block.innerHTML = `<div class="category-title">${district}</div>`;
+        categories[district].forEach(m => {
+          const item = document.createElement('div');
+          item.className = 'result-item';
+          item.innerHTML = `
+            <strong>${m.Name}</strong>
+            <span class="map-link" onclick="openMap('${m.Name}, ${m.Postal_Address}')">📍 Map</span>
+          `;
+          block.appendChild(item);
+        });
+        container.appendChild(block);
+      });
+    }
+
+    async function searchMonasteries() {
+      const query = document.getElementById('searchBox').value;
+      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
+      const results = await res.json();
+      displayResults(results);
+      document.getElementById('suggestions').style.display = 'none';
+    }
+
+    function displayResults(results) {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+      if (results.length === 0) {
+        resultsDiv.innerHTML = '<p>No results found.</p>';
+        return;
+      }
+      results.forEach(m => {
+        const item = document.createElement('div');
+        item.className = 'result-item';
+        item.innerHTML = `
+          <h3>${m.Name}</h3>
+          <p><strong>Address:</strong> ${m.Postal_Address}</p>
+          <p><strong>District:</strong> ${m.District}</p>
+          <p><strong>Know More:</strong> <a href="${m.Link}" target="_blank">${m.Name}</a></p>
+          <span class="map-link" onclick="openMap('${m.Name}, ${m.Postal_Address}, ${m.District}')">📍 View on Map</span>
+        `;
+        resultsDiv.appendChild(item);
+      });
+    }
+
+    function showSuggestions(query) {
+      const suggestionsDiv = document.getElementById('suggestions');
+      suggestionsDiv.innerHTML = '';
+      if (!query) {
+        suggestionsDiv.style.display = 'none';
+        return;
+      }
+      const filtered = monasteries
+        .filter(m => m.Name.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 10);
+      
+      if (filtered.length === 0) {
+        suggestionsDiv.style.display = 'none';
+        return;
+      }
+
+      filtered.forEach(m => {
+        const item = document.createElement('div');
+        item.className = 'suggestion-item';
+        item.textContent = `${m.Name} (${m.District})`;
+        item.onclick = () => {
+          document.getElementById('searchBox').value = m.Name;
+          suggestionsDiv.style.display = 'none';
+          searchMonasteries();
+        };
+        suggestionsDiv.appendChild(item);
+      });
+      suggestionsDiv.style.display = 'block';
+    }
+
+    function openMap(location) {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank');
+    }
+
+    // Event Listeners
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+      showSuggestions(e.target.value);
+    });
+    document.getElementById('searchBtn').addEventListener('click', searchMonasteries);
+
+    window.onload = async () => {
+      await fetchAllData();
+      await loadCategories();
+    };
+  </script>
+</body>
+</html>
